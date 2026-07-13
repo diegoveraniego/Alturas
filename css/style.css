@@ -1,0 +1,195 @@
+:root {
+    --bg-color: #111111;
+    --panel-bg: #1e1e1e;
+    --text-color: #ededed;
+    --accent: #4a9eff;
+    --accent-hover: #3a8ee0;
+    --border-color: #333333;
+    
+    --key-white: #f0f0f0;
+    --key-black: #111111;
+    --key-active: #4a9eff;
+    --key-correct: #4ade80;
+    --key-wrong: #f87171;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Aporetic Sans Mono', 'Fira Code', 'Roboto Mono', monospace;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.5;
+    padding: 2rem;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+#midi-status {
+    position: absolute;
+    right: 0;
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    background: #333;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#midi-status.connected {
+    background: #166534;
+    color: #4ade80;
+}
+
+.panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.controls {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+label {
+    font-size: 0.875rem;
+    color: #a0a0a0;
+}
+
+select, button {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+select:focus, button:focus {
+    outline: 1px solid var(--accent);
+    border-color: var(--accent);
+}
+
+button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: var(--accent-hover);
+}
+
+/* Piano Styles */
+.piano-container {
+    overflow-x: auto;
+    padding: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+svg.piano {
+    display: block;
+}
+
+.key {
+    stroke: var(--border-color);
+    stroke-width: 1px;
+}
+
+.key-white {
+    fill: var(--key-white);
+}
+
+.key-black {
+    fill: var(--key-black);
+}
+
+.key.active { fill: var(--key-active); }
+.key.correct { fill: var(--key-correct); }
+.key.wrong { fill: var(--key-wrong); }
+
+/* Progress */
+ul {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+li {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Info Panel */
+.text-center {
+    text-align: center;
+}
+
+#current-exercise-name {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.structure-badge {
+    display: inline-block;
+    background: #2a2a2a;
+    color: #4ade80;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    letter-spacing: 2px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.structure-badge.visible {
+    opacity: 1;
+}

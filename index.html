@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alturas - Home</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            background-color: #0a0512; 
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 4px,
+                    rgba(100, 50, 180, 0.06) 4px,
+                    rgba(100, 50, 180, 0.06) 8px
+                ),
+                linear-gradient(to bottom, #1a0a2e 0%, #0f0820 20%, #0a0512 60%);
+        }
+        #canvas-container { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            z-index: 1; 
+            filter: contrast(1.2) sepia(0.4) saturate(1.3);
+        }
+        canvas {
+            image-rendering: pixelated;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        .char-select {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 800px;
+        }
+        .char-card {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            width: 140px;
+            pointer-events: auto;
+        }
+        .char-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-5px);
+        }
+        .char-card.selected {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.2);
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+        }
+        .char-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .char-name {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+        #menu {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2rem;
+            pointer-events: none;
+        }
+        
+        #menu > * {
+            pointer-events: auto;
+        }
+
+        .title-container {
+            margin-top: 2vh;
+            text-align: center;
+        }
+        .overlay h1 { 
+            font-size: 5rem; 
+            letter-spacing: 0.5rem; 
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8); 
+            margin-bottom: 3rem; 
+        }
+        .buttons { 
+            display: flex; 
+            gap: 2rem; 
+            pointer-events: auto; 
+        }
+        .btn-large { 
+            font-size: 1.2rem; 
+            padding: 1rem 2rem; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            display: inline-block; 
+            text-align: center; 
+            background: rgba(30,30,30,0.7); 
+            backdrop-filter: blur(5px); 
+            border: 1px solid var(--border-color); 
+            color: white; 
+            transition: all 0.3s; 
+            font-family: inherit;
+        }
+        .btn-large:hover { 
+            background: var(--accent); 
+            transform: translateY(-3px); 
+            box-shadow: 0 4px 15px rgba(74, 158, 255, 0.4);
+        }
+        .mode-btn {
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            border: 4px solid var(--accent);
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Aporetic Sans Mono', 'Roboto Mono', monospace;
+            text-transform: uppercase;
+            box-shadow: 4px 4px 0px 0px var(--accent);
+            border-radius: 0; /* Low poly/blocky look */
+            clip-path: polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%); /* Polygonal cut */
+        }
+        .mode-btn:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 2px 2px 0px 0px #000;
+            transform: translate(2px, 2px);
+        }
+    </style>
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/geometries/TextGeometry.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import { MidiController } from './js/midi.js';
+        import { AudioController } from './js/audio.js';
+        
+        // POC: Escena Three.js (Montaña nevada y "notas" rotando)
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0f0820, 0.03); // Dark purple fog
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 15;
+        camera.position.y = 5;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+        
+        // Low res for retro aesthetic
+        const scaleFactor = 4;
+        renderer.setSize(window.innerWidth / scaleFactor, window.innerHeight / scaleFactor, false);
+        container.appendChild(renderer.domElement);
+
+        // Iluminación
+        const ambientLight = new THREE.AmbientLight(0x8866cc, 0.4); // Purple ambient
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xccaaff, 0.7);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // Montaña low-poly
+        const mountainGeo = new THREE.ConeGeometry(8, 16, 6); // 6 sides = low poly
+        const mountainMat = new THREE.MeshStandardMaterial({ 
+            color: 0x4a3a6a, 
+            flatShading: true,
+            roughness: 0.9
+        });
+        const mountain = new THREE.Mesh(mountainGeo, mountainMat);
+        mountain.position.y = 0;
+        scene.add(mountain);
+        
+        // Snow cap on top
+        const snowGeo = new THREE.ConeGeometry(3, 4, 6);
+        const snowMat = new THREE.MeshStandardMaterial({ color: 0xeeeeff, flatShading: true, roughness: 0.7 });
+        const snowCap = new THREE.Mesh(snowGeo, snowMat);
+        snowCap.position.y = 6;
+        mountain.add(snowCap);
+        
+        // Rocky details
+        for (let r = 0; r < 8; r++) {
+            const rockGeo = new THREE.BoxGeometry(1 + Math.random(), 0.8 + Math.random(), 1 + Math.random());
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x3a2a5a, flatShading: true });
+            const rock = new THREE.Mesh(rockGeo, rockMat);
+            const angle = (r / 8) * Math.PI * 2;
+            const dist = 4 + Math.random() * 2;
+            rock.position.set(Math.cos(angle) * dist, -6 + Math.random() * 3, Math.sin(angle) * dist);
+            rock.rotation.set(Math.random(), Math.random(), Math.random());
+            mountain.add(rock);
+        }
+
+        // Character 3D Preview (Center Screen)
+        const characters = [
+            { id: 'synth', name: 'Sintetizador Guerrero', color: 0x00ffff },
+            { id: 'rock', name: 'Rockero Eléctrico', color: 0xff4500 },
+            { id: 'singer', name: 'Cantante Pop', color: 0xff69b4 },
+            { id: 'jazz', name: 'Trompetista Jazz', color: 0xffd700 },
+            { id: 'pianist', name: 'Pianista Elegante', color: 0xaaaaaa }
+        ];
+        let currentCharIndex = 0;
+        let selectedChar = characters[0].id;
+        
+        const previewGroup = new THREE.Group();
+        scene.add(previewGroup);
+        previewGroup.position.set(0, 4.5, 9);
+        
+        // --- 3D UI SYSTEM ---
+        const uiGroup = new THREE.Group();
+        scene.add(uiGroup);
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const interactiveObjects = [];
+        
+        // --- 3D TITLE "ALTURAS" ---
+        const titleGroup = new THREE.Group();
+        scene.add(titleGroup);
+        titleGroup.position.set(0, 9, 4);
+        
+        const fontLoader = new THREE.FontLoader();
+        fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.134.0/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+            const titleGeo = new THREE.TextGeometry('ALTURAS', {
+                font: font,
+                size: 1.8,
+                height: 0.8,
+                curveSegments: 2, // LOW POLY!
+                bevelEnabled: true,
+                bevelThickness: 0.15,
+                bevelSize: 0.08,
+                bevelSegments: 1 // LOW POLY bevel
+            });
+            titleGeo.computeBoundingBox();
+            titleGeo.center();
+            
+            const titleMat = new THREE.MeshStandardMaterial({ 
+                color: 0xcc88ff, 
+                flatShading: true,
+                roughness: 0.4,
+                metalness: 0.3
+            });
+            const titleMesh = new THREE.Mesh(titleGeo, titleMat);
+            titleGroup.add(titleMesh);
+            
+            // Subtitle
+            const subGeo = new THREE.TextGeometry('BOHEMIAN JAZZ', {
+                font: font,
+                size: 0.4,
+                height: 0.15,
+                curveSegments: 2,
+                bevelEnabled: false
+            });
+            subGeo.computeBoundingBox();
+            subGeo.center();
+            const subMat = new THREE.MeshStandardMaterial({ color: 0x9966cc, flatShading: true, roughness: 0.6 });
+            const subMesh = new THREE.Mesh(subGeo, subMat);
+            subMesh.position.y = -1.5;
+            titleGroup.add(subMesh);
+        });
+        
+        // Title light
+        const titleLight = new THREE.PointLight(0xaa77ee, 2, 15);
+        titleLight.position.set(0, 10, 6);
+        scene.add(titleLight);
+        
+        // --- 3D BUTTONS (high-res canvas textures) ---
+        function create3DButton(text, w, h, x, y, z, action) {
+            const CW = 1024;
+            const CH = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = CW;
+            canvas.height = CH;
+            const ctx = canvas.getContext('2d');
+            
+            // Dark purple background
+            ctx.fillStyle = '#120822';
+            ctx.fillRect(0, 0, CW, CH);
+            
+            // Light purple border
+            ctx.strokeStyle = '#cc88ff';
+            ctx.lineWidth = 16;
+            ctx.strokeRect(8, 8, CW - 16, CH - 16);
+            
+            // Corner cuts (low-poly feel)
+            ctx.fillStyle = '#120822';
+            ctx.fillRect(0, 0, 30, 30);
+            ctx.fillRect(CW - 30, 0, 30, 30);
+            ctx.fillRect(0, CH - 30, 30, 30);
+            ctx.fillRect(CW - 30, CH - 30, 30, 30);
+            
+            // Light purple text - BIG
+            ctx.fillStyle = '#cc88ff';
+            ctx.font = 'bold 100px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, CW / 2, CH / 2);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            
+            // Thicker box for more 3D presence
+            const geo = new THREE.BoxGeometry(w, h, 0.5);
+            
+            // Front face gets the texture, sides get purple edge
+            const sideMat = new THREE.MeshStandardMaterial({ color: 0x1a0a2e, flatShading: true, roughness: 0.7 });
+            const frontMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 });
+            const edgeMat = new THREE.MeshStandardMaterial({ color: 0x8855cc, flatShading: true, roughness: 0.5 });
+            // BoxGeometry faces: +x, -x, +y, -y, +z (front), -z (back)
+            const mats = [edgeMat, edgeMat, edgeMat, edgeMat, frontMat, sideMat];
+            
+            const mesh = new THREE.Mesh(geo, mats);
+            mesh.position.set(x, y, z);
+            
+            mesh.userData = { action, isButton: true, canvas, ctx, tex, CW, CH };
+            uiGroup.add(mesh);
+            interactiveObjects.push(mesh);
+            return mesh;
+        }
+        
+        // Character name label (3D box with text)
+        function create3DLabel(text, w, h, x, y, z) {
+            const CW = 1024;
+            const CH = 192;
+            const canvas = document.createElement('canvas');
+            canvas.width = CW;
+            canvas.height = CH;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, CW, CH);
+            ctx.font = 'bold 110px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Shadow
+            ctx.fillStyle = '#3a1a6a';
+            ctx.fillText(text, CW / 2 + 6, CH / 2 + 6);
+            // Main
+            ctx.fillStyle = '#cc88ff';
+            ctx.fillText(text, CW / 2, CH / 2);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            
+            const geo = new THREE.PlaneGeometry(w, h);
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            uiGroup.add(mesh);
+            return { mesh, ctx, tex, canvas, CW, CH };
+        }
+        
+        // Character name label
+        const charLabel = create3DLabel('SINTETIZADOR', 5, 1.2, 0, 2.8, 9);
+        
+        // Arrow buttons (bigger)
+        create3DButton('<', 1.2, 1, -3, 4.5, 9, () => {
+            currentCharIndex = (currentCharIndex - 1 + characters.length) % characters.length;
+            updateCharacterPreview();
+        });
+        
+        create3DButton('>', 1.2, 1, 3, 4.5, 9, () => {
+            currentCharIndex = (currentCharIndex + 1) % characters.length;
+            updateCharacterPreview();
+        });
+        
+        // Game mode buttons (wider, taller)
+        create3DButton('ESCALAS', 4, 1, -2.2, 1.2, 9, () => {
+            window.location.href = `zombie.html?mode=scales&char=${selectedChar}&t=${Date.now()}`;
+        });
+        
+        create3DButton('ACORDES', 4, 1, 2.2, 1.2, 9, () => {
+            window.location.href = `zombie.html?mode=chords&char=${selectedChar}&t=${Date.now()}`;
+        });
+        
+        const soundBtn = create3DButton('SOUND OFF', 4, 1, -2.2, 0, 9, async () => {
+            if (!ambientSoundEnabled) {
+                await audioMelody.init('muted_trumpet'); 
+                await audio.init('acoustic_grand_piano'); 
+                ambientSoundEnabled = true;
+                
+                // Repaint button texture
+                const { ctx: c, CW: cw, CH: ch, tex: t } = soundBtn.userData;
+                c.fillStyle = '#120822';
+                c.fillRect(0, 0, cw, ch);
+                c.strokeStyle = '#88ffcc';
+                c.lineWidth = 16;
+                c.strokeRect(8, 8, cw - 16, ch - 16);
+                c.fillStyle = '#120822';
+                c.fillRect(0, 0, 30, 30); c.fillRect(cw-30, 0, 30, 30);
+                c.fillRect(0, ch-30, 30, 30); c.fillRect(cw-30, ch-30, 30, 30);
+                c.fillStyle = '#88ffcc';
+                c.font = 'bold 100px "Courier New", monospace';
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.fillText('SOUND ON', cw / 2, ch / 2);
+                t.needsUpdate = true;
+                
+                // Update side edges to teal-green
+                soundBtn.material[0] = soundBtn.material[1] = soundBtn.material[2] = soundBtn.material[3] = 
+                    new THREE.MeshStandardMaterial({ color: 0x44cc88, flatShading: true, roughness: 0.5 });
+                
+                playCurrentChord();
+            }
+        });
+        
+        create3DButton('EDITOR', 4, 1, 2.2, 0, 9, () => {
+            window.location.href = `editor.html`;
+        });
+        
+        // Mouse interaction
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+        
+        window.addEventListener('click', (e) => {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects, false);
+            if (intersects.length > 0) {
+                const btn = intersects[0].object;
+                if (btn.userData.action) {
+                    btn.userData.action();
+                    btn.scale.set(0.9, 0.9, 0.9);
+                    setTimeout(() => btn.scale.set(1, 1, 1), 100);
+                }
+            }
+        });
+        // --- END 3D UI SYSTEM ---
+
+        function updateCharacterPreview() {
+            while(previewGroup.children.length > 0){ 
+                previewGroup.remove(previewGroup.children[0]); 
+            }
+            
+            const char = characters[currentCharIndex];
+            selectedChar = char.id;
+            
+            // Update 3D Label text
+            const { ctx: lc, CW: lcw, CH: lch } = charLabel;
+            lc.clearRect(0, 0, lcw, lch);
+            lc.font = 'bold 110px "Courier New", monospace';
+            lc.textAlign = 'center';
+            lc.textBaseline = 'middle';
+            lc.fillStyle = '#3a1a6a';
+            lc.fillText(char.name.toUpperCase(), lcw / 2 + 6, lch / 2 + 6);
+            lc.fillStyle = '#cc88ff';
+            lc.fillText(char.name.toUpperCase(), lcw / 2, lch / 2);
+            charLabel.tex.needsUpdate = true;
+            
+            const pGroup = new THREE.Group();
+            
+            const bodyGeo = new THREE.BoxGeometry(1, 1.5, 0.5);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: char.color, roughness: 0.5 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.75;
+            pGroup.add(body);
+            
+            const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffaaaa });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.8;
+            pGroup.add(head);
+            
+            // Accessories
+            if (char.id === 'synth') {
+                const acc = new THREE.Mesh(new THREE.BoxGeometry(2, 0.3, 0.8), new THREE.MeshStandardMaterial({ color: 0xff00ff }));
+                acc.position.set(0, 0.8, 0.5);
+                acc.rotation.y = 0.2;
+                pGroup.add(acc);
+            } else if (char.id === 'rock') {
+                const acc = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 0.2), new THREE.MeshStandardMaterial({ color: 0xcc0000 }));
+                acc.position.set(0, 0.8, 0.4);
+                acc.rotation.z = Math.PI / 6;
+                pGroup.add(acc);
+            } else if (char.id === 'singer') {
+                const acc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x444444 }));
+                acc.position.set(0, 1.4, 0.4);
+                pGroup.add(acc);
+            } else if (char.id === 'jazz') {
+                const acc = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0xffd700 }));
+                acc.position.set(0, 1.4, 0.6);
+                acc.rotation.x = Math.PI / 2;
+                pGroup.add(acc);
+                const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.2), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+                hat.position.y = 2.2;
+                pGroup.add(hat);
+            } else if (char.id === 'pianist') {
+                const acc = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.3), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                acc.position.set(0.2, 1.7, 0.4);
+                pGroup.add(acc);
+                const tie = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 0.1), new THREE.MeshStandardMaterial({ color: 0x000000 }));
+                tie.position.set(0, 1.0, 0.26);
+                pGroup.add(tie);
+            }
+            
+            pGroup.position.y = -1.5; 
+            previewGroup.add(pGroup);
+        }
+        updateCharacterPreview();
+
+        // Notas musicales 3D flotando alrededor de la montaña
+        const NOTE_COLORS = [0xff0000, 0xff4500, 0xffa500, 0xffd700, 0xffff00, 0x00ff00, 0x00ffff, 0x0000ff, 0x4b0082, 0x800080, 0xff1493, 0xff69b4];
+        const notes = [];
+        for(let i=0; i<12; i++) {
+            const nGroup = new THREE.Group();
+            const noteColor = NOTE_COLORS[i];
+            const noteMat = new THREE.MeshStandardMaterial({ color: noteColor, flatShading: true, roughness: 0.5 });
+            
+            // Note head (ellipsoid - squished sphere)
+            const headGeo = new THREE.SphereGeometry(0.3, 4, 4); // low poly sphere
+            const noteHead = new THREE.Mesh(headGeo, noteMat);
+            noteHead.scale.set(1.3, 1, 0.8); // squish into ellipse
+            noteHead.rotation.z = -0.3; // slight tilt like real notes
+            nGroup.add(noteHead);
+            
+            // Stem / plica
+            const stemGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.4, 4);
+            const stem = new THREE.Mesh(stemGeo, noteMat);
+            stem.position.set(0.3, 0.7, 0); // attached to right side of head, going up
+            nGroup.add(stem);
+            
+            // Flag (for eighth notes) - a little triangle
+            if (Math.random() > 0.4) {
+                const flagGeo = new THREE.BoxGeometry(0.05, 0.5, 0.2);
+                const flag = new THREE.Mesh(flagGeo, noteMat);
+                flag.position.set(0.3, 1.2, 0.1);
+                flag.rotation.z = 0.3;
+                nGroup.add(flag);
+            }
+
+            nGroup.userData = {
+                radius: 5 + Math.random() * 6,
+                speed: 0.005 + Math.random() * 0.015,
+                angle: Math.random() * Math.PI * 2,
+                yOffset: 2 + Math.random() * 8,
+                bobSpeed: 1 + Math.random() * 2
+            };
+            notes.push(nGroup);
+            scene.add(nGroup);
+        }
+
+        // Sistema de Partículas (Nieve cayendo)
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 500;
+        const posArray = new Float32Array(particlesCount * 3);
+        for(let i = 0; i < particlesCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 40; // x, y, z spread
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particleMaterial = new THREE.PointsMaterial({ 
+            size: 0.15, 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        const particleMesh = new THREE.Points(particlesGeo, particleMaterial);
+        scene.add(particleMesh);
+        
+        // Soundwaves
+        const waves = [];
+        let ambientSoundEnabled = false;
+        const audio = new AudioController();       // Piano (Chords)
+        const audioMelody = new AudioController(); // Trumpet (Melody)
+        const midi = new MidiController();
+        
+        let currentKey = 0; // C=0
+        let currentChordIndex = 0; // 0=II, 1=V, 2=I
+        let notesPlayedInChord = 0;
+        let isFirstChordPlayed = false;
+        
+        function getNextJazzNote() {
+            const roots = [ (currentKey + 2) % 12, (currentKey + 7) % 12, currentKey ];
+            const scales = [
+                [0, 2, 3, 5, 7, 9, 10], // Dorian (II)
+                [0, 2, 4, 5, 7, 9, 10], // Mixolydian (V)
+                [0, 2, 4, 5, 7, 9, 11]  // Ionian (I)
+            ];
+            
+            const root = roots[currentChordIndex];
+            const scale = scales[currentChordIndex];
+            const notePC = (root + scale[Math.floor(Math.random() * scale.length)]) % 12;
+            const octave = 4 + Math.floor(Math.random() * 2);
+            
+            notesPlayedInChord++;
+            if (notesPlayedInChord > 3) {
+                notesPlayedInChord = 0;
+                currentChordIndex++;
+                if (currentChordIndex > 2) {
+                    currentChordIndex = 0;
+                    currentKey = (currentKey + 5) % 12; // Modulate down a 5th (circle of fourths)
+                }
+            }
+            return notePC + (octave + 1) * 12;
+        }
+
+        function playCurrentChord() {
+            const roots = [ (currentKey + 2) % 12, (currentKey + 7) % 12, currentKey ];
+            const root = roots[currentChordIndex];
+            
+            // Usar voicings de 5 notas (tétrada + 9na) para que suene ultra jazzero
+            let chordTones = [];
+            if (currentChordIndex === 0) chordTones = [0, 3, 7, 10, 14]; // m9
+            else if (currentChordIndex === 1) chordTones = [0, 4, 7, 10, 14]; // 9
+            else chordTones = [0, 4, 7, 11, 14]; // maj9
+            
+            chordTones.forEach(interval => {
+                const note = (root + interval) % 12 + 48 + (interval >= 12 ? 12 : 0); // Octave 3 (48) and Octave 4 for 9th
+                audio.playNote(note, 0.8);
+            });
+        }
+
+        setInterval(() => {
+            if (ambientSoundEnabled && audioMelody.loaded && Math.random() < 0.6) {
+                const oldChordIndex = currentChordIndex;
+                const note = getNextJazzNote();
+                const duration = Math.random() > 0.5 ? 0.15 : 0.3;
+                
+                audioMelody.playNote(note, duration);
+                spawnWave(null, note);
+                
+                if (oldChordIndex !== currentChordIndex || !isFirstChordPlayed) {
+                    playCurrentChord();
+                    isFirstChordPlayed = true;
+                }
+            }
+        }, 300);
+
+        function spawnWave(color = null, note = null) {
+            if (color === null && note !== null) {
+                color = NOTE_COLORS[note % 12] || 0xffffff;
+            } else if (!color) {
+                const pc = Math.floor(Math.random() * 12);
+                color = NOTE_COLORS[pc] || 0xffffff;
+            }
+            
+            const points = [];
+            for (let i = 0; i <= 32; i++) {
+                const theta = (i / 32) * Math.PI * 2;
+                points.push(new THREE.Vector3(Math.cos(theta), 0, Math.sin(theta)));
+            }
+            const geo = new THREE.BufferGeometry().setFromPoints(points);
+            const mat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.8, linewidth: 2 });
+            const wave = new THREE.LineLoop(geo, mat);
+            
+            wave.position.y = 1 + Math.random() * 6;
+            wave.rotation.x = (Math.random() - 0.5) * 0.4;
+            wave.rotation.z = (Math.random() - 0.5) * 0.4;
+            wave.scale.set(0.1, 0.1, 0.1);
+            
+            scene.add(wave);
+            waves.push({ mesh: wave, life: 60 });
+        }
+
+        // Animación principal
+        function animate() {
+            requestAnimationFrame(animate);
+            mountain.rotation.y += 0.002;
+            
+            previewGroup.rotation.y += 0.01;
+            
+            // Hover effect on 3D buttons
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects, false);
+            interactiveObjects.forEach(obj => {
+                obj.scale.set(1, 1, 1);
+            });
+            if (intersects.length > 0) {
+                document.body.style.cursor = 'pointer';
+                intersects[0].object.scale.set(1.05, 1.05, 1.05);
+            } else {
+                document.body.style.cursor = 'default';
+            }
+            
+            // Musical notes orbiting + bobbing
+            notes.forEach(n => {
+                n.userData.angle += n.userData.speed;
+                n.position.x = Math.cos(n.userData.angle) * n.userData.radius;
+                n.position.z = Math.sin(n.userData.angle) * n.userData.radius;
+                n.position.y = n.userData.yOffset + Math.sin(Date.now() * 0.002 * n.userData.bobSpeed) * 0.8;
+                n.rotation.y = -n.userData.angle;
+                n.rotation.z = Math.sin(Date.now() * 0.003) * 0.15; // gentle sway
+            });
+            
+            // Caída de la nieve
+            const positions = particleMesh.geometry.attributes.position.array;
+            for(let i=1; i<particlesCount*3; i+=3) {
+                positions[i] -= 0.05; // y velocity
+                if(positions[i] < -10) {
+                    positions[i] = 20; // reset to top
+                }
+            }
+            particleMesh.geometry.attributes.position.needsUpdate = true;
+            
+            // Ondas de sonido
+            if (Math.random() < 0.03) spawnWave();
+            for (let i = waves.length - 1; i >= 0; i--) {
+                const w = waves[i];
+                w.life--;
+                w.mesh.scale.x += 0.3;
+                w.mesh.scale.z += 0.3;
+                w.mesh.material.opacity = w.life / 60;
+                if (w.life <= 0) {
+                    scene.remove(w.mesh);
+                    waves.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Responsive
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth / scaleFactor, window.innerHeight / scaleFactor, false);
+        });
+
+    </script>
+</body>
+</html>
